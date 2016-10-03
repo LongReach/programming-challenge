@@ -1,151 +1,12 @@
 /// <reference path="../typings/index.d.ts" />
+/// <reference path="grid.ts" />
 
+import gridFile = require('./grid');
 import PIXI = require('pixi.js');
 const renderer:PIXI.WebGLRenderer = new PIXI.WebGLRenderer(1280, 720);
 document.body.appendChild(renderer.view);
 
-// -----------------------
-// Class definitions
-// -----------------------
-
-/*
-  Represents a cell on the game board. A cell contains an arrow Sprite
-  which points in one of four cardinal directions. Each cell acts as
-  a button and can be clicked.
-*/
-class GridCell {
-  sprite:PIXI.Sprite;
-  // Arrow's facing direction: 0=left, 1=up, 2=right, 3=down
-  direction:number;
-  cellX:number; // coordinate on the game board, from left
-  cellY:number; // coordinate on the game board, from top
-  visited:boolean; // if the cell has been visited by game piece
-
-  constructor(i:number, j:number, container:PIXI.Container) {
-    var arrow = PIXI.Sprite.fromImage('images/arrow-icon.png');
-    arrow.x = cellDim * (i + 0.5);
-    arrow.y = cellDim * (j + 0.5);
-    arrow.width = cellDim;
-    arrow.height = cellDim;
-    arrow.anchor.x = 0.5;
-    arrow.anchor.y = 0.5;
-    container.addChild(arrow);
-    this.cellX = i;
-    this.cellY = j;
-    this.sprite = arrow;
-    this.direction = 0;
-    this.setVisited(false);
-
-    // onEvent functions are global functions (towards bottom of file)
-    arrow.buttonMode = true;
-    arrow.interactive = true;
-    arrow.on('mousedown', onButtonDown);
-    arrow.on('mouseover', onButtonOver);
-    arrow.on('mouseout', onButtonOut)
-  }
-
-  // Sets the direction of the arrow: 0=left, 1=up, 2=right, 3=down
-  setDirection(val) {
-    const pi = 3.14159265;
-    this.sprite.rotation = pi * val / 2.0;
-    this.direction = val;
-  }
-
-  // Sets if the cell has been visited by a game piece
-  setVisited(value:boolean) {
-    if (value) {
-      this.sprite.tint = 0xffffff; // make brighter
-    }
-    else {
-      this.sprite.tint = 0xff77aa;
-    }
-    this.visited = value;
-  }
-
-  // If value==true, temporarily highlights the cell
-  // If value==true, it reverts to its previous color
-  setHighlight(value:boolean) {
-    let currentValue:boolean = this.visited;
-    if (!value) {
-      value = currentValue;
-    }
-    this.setVisited(value);
-    this.visited = currentValue;
-  }
-}
-
-/*
-  --------------------------------------------
-  Represents the entire game board. Contains a 2d array of GricCell objects.
-  --------------------------------------------
-*/
-class ArrowGrid {
-  container:PIXI.Container;
-  grid:GridCell[][];
-  dimX:number; // dimension of game board in cells
-  dimY:number;
-
-  constructor(width:number, height:number) {
-    this.container = new PIXI.Container();
-    stage.addChild(this.container);
-    this.container.x = 100;
-    this.container.y = 60;
-    this.dimX = width;
-    this.dimY = height;
-    this.grid = [];
-    for (var j = 0; j < height; j++) {
-      this.grid[j] = [];
-      for (var i = 0; i < width; i++) {
-        let newCell:GridCell = new GridCell(i, j, this.container);
-        this.grid[j][i] = newCell;
-      };
-    }
-    this.reshuffleArrows();
-  }
-
-  // Marks all cells as unvisited
-  resetArrows() {
-    for (var j = 0; j < this.dimY; j++) {
-      for (var i = 0; i < this.dimX; i++) {
-        this.grid[j][i].setVisited(false);
-      };
-    }
-  }
-
-  // Marks all cells as unvisited and changes arrow directions
-  reshuffleArrows() {
-    for (var j = 0; j < this.dimY; j++) {
-      for (var i = 0; i < this.dimX; i++) {
-        this.grid[j][i].setVisited(false);
-        // It's a little boring to have two arrows pointing at each other, so prevent that
-        let allowedDirections:boolean[] = [true, true, true, true, false];
-        // Is the one above me pointing down?
-        if (j > 0 && this.grid[j-1][i].direction == 3) {
-          // Not allowed to point straight up
-          allowedDirections[1] = false;
-          //console.log("Forbidden up at " + i + "," + j);
-        }
-        // Is the one to my left pointing right?
-        if (i > 0 && this.grid[j][i-1].direction == 2) {
-          // Not allowed to point left
-          allowedDirections[0] = false;
-          //console.log("Forbidden left at " + i + "," + j);
-        }
-        let proposedDirection:number = 4; // not a valid direction, so the first test will fail
-        while (allowedDirections[proposedDirection] == false)
-        {
-          proposedDirection = Math.floor(Math.random() * 4.0);
-        }
-        this.grid[j][i].setDirection(proposedDirection);
-      };
-    }
-  }
-
-  // Returns ref to cell at particular grid location
-  getCell(gridX:number, gridY:number) {
-    return this.grid[gridY][gridX];
-  }
-}
+let cellDim:number = 50;
 
 /*
   --------------------------------------------
@@ -383,7 +244,7 @@ class GridCharacter {
   --------------------------------------------
 */
 class TheGame {
-  theGrid:ArrowGrid;
+  theGrid:gridFile.ArrowGrid;
 
   checkerCharacter:GridCharacter;
   checkMarkCharacter:GridCharacter;
@@ -397,7 +258,8 @@ class TheGame {
   paused:boolean;
 
   constructor() {
-    this.theGrid = new ArrowGrid(10, 10);
+    this.theGrid = new gridFile.ArrowGrid(10, 10, stage);
+    this.theGrid.setMouseFunctions(onButtonDown, onButtonOver, onButtonOut);
 
     // create a text object with a nice stroke
     this.infoText = new PIXI.Text('Place piece on board', { font: 'bold 36px Arial', fill: '#ffff00', align: 'left', stroke: '#0000FF', strokeThickness: 4 });
@@ -470,7 +332,7 @@ class TheGame {
         else
         {
           // Character is still on board
-          let cell:GridCell = this.theGrid.getCell(char.cellIndexRight, char.cellIndexDown);
+          let cell:gridFile.GridCell = this.theGrid.getCell(char.cellIndexRight, char.cellIndexDown);
           cell.setVisited(true);
           char.requestNewMove(cell.direction);
         }
@@ -524,14 +386,14 @@ class TheGame {
   handleCellOver(pixX:number, pixY:number) {
     let cellX = Math.floor(pixX / cellDim);
     let cellY = Math.floor(pixY / cellDim);
-    let cell:GridCell = this.theGrid.getCell(cellX, cellY);
+    let cell:gridFile.GridCell = this.theGrid.getCell(cellX, cellY);
     cell.setHighlight(true);
   }
 
   handleCellOut(pixX:number, pixY:number) {
     let cellX = Math.floor(pixX / cellDim);
     let cellY = Math.floor(pixY / cellDim);
-    let cell:GridCell = this.theGrid.getCell(cellX, cellY);
+    let cell:gridFile.GridCell = this.theGrid.getCell(cellX, cellY);
     cell.setHighlight(false);
   }
 
@@ -574,9 +436,6 @@ class TheGame {
 
 // create the root of the scene graph
 var stage = new PIXI.Container();
-
-// Array and dimensions for the grid
-let cellDim:number = 50;
 
 let gameInstance:TheGame;
 
