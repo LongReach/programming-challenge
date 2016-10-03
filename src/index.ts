@@ -24,12 +24,22 @@ class GridCell {
     container.addChild(arrow);
     this.sprite = arrow;
     this.direction = 0;
+    this.setVisited(false);
   }
 
   setDirection(val) {
     const pi = 3.14159265;
     this.sprite.rotation = pi * val / 2.0;
     this.direction = val;
+  }
+
+  setVisited(visited:boolean) {
+    if (visited) {
+      this.sprite.tint = 0xffffff;
+    }
+    else {
+      this.sprite.tint = 0xff77aa;
+    }
   }
 }
 
@@ -77,8 +87,14 @@ class GridCharacter {
     if (this.state != "active") {
       return false;
     }
-
     return (!this.isMoving && this.restTimer == 0);
+  }
+
+  isCollidable() {
+    if (this.state != "active") {
+      return false;
+    }
+    return !this.isMoving;
   }
 
   requestNewMove(direction) {
@@ -113,7 +129,9 @@ class GridCharacter {
   }
 
   setState(state:string) {
-    if (this.state == state) {
+    if (this.state == state || this.state == "inactive") {
+      // Nothing happens if we're already in requested state or if character
+      // is inactive
       return;
     }
     console.log("state to " + state);
@@ -193,6 +211,8 @@ class ArrowGrid {
   checkerCharacter:GridCharacter;
   checkMarkCharacter:GridCharacter;
 
+  theText:PIXI.Text;
+
   constructor(width:number, height:number) {
     this.container = new PIXI.Container();
     stage.addChild(this.container);
@@ -231,6 +251,12 @@ class ArrowGrid {
         };
     };
 
+    // create a text object with a nice stroke
+    this.theText = new PIXI.Text('Click to begin', { font: 'bold 36px Arial', fill: '#ffff00', align: 'left', stroke: '#0000FF', strokeThickness: 4 });
+    this.theText.position.x = this.container.x + cellDim * (this.dimX + 1);
+    this.theText.position.y = this.container.y + cellDim;
+    stage.addChild(this.theText);
+
     //let startPosX:number = Math.floor(Math.random() * this.dimX);
     //let startPosY:number = Math.floor(Math.random() * this.dimY);
     let startPosX:number = 2 + Math.floor(Math.random() * 5);
@@ -255,24 +281,31 @@ class ArrowGrid {
         }
         else
         {
+          this.grid[char.cellIndexDown][char.cellIndexRight].setVisited(true);
           char.requestNewMove(this.grid[char.cellIndexDown][char.cellIndexRight].direction);
         }
       }
     } // end for
 
     if (!this.checkerCharacter.isOnGrid) {
+      // slower-moving piece has left the board
       this.checkerCharacter.setState("frozen");
     }
     if (!this.checkMarkCharacter.isOnGrid) {
+      // faster-moving piece has left the board
       this.checkMarkCharacter.setState("dying");
+      this.checkerCharacter.setState("frozen");
+      this.theText.text = "No Loop"
     }
     // Are both pieces on the same square? If so, the faster-moving one has caught up with
     // the slower.
-    else if (!characters[0].isMoving && !characters[1].isMoving &&
+    else if (characters[0].isCollidable() && characters[1].isCollidable() &&
       characters[0].cellIndexDown == characters[1].cellIndexDown &&
       characters[0].cellIndexRight == characters[1].cellIndexRight) {
+        // We've caught up
         this.checkerCharacter.setState("frozen");
         this.checkMarkCharacter.setState("explode");
+        this.theText.text = "Loop Detected!"
     }
   }
 }
@@ -298,13 +331,14 @@ doSetup();
 // -----------------------
 
 function update() {
-    theGrid.update(0.01);
+    theGrid.update(0.01); // advance clock by 1/100th of a second
 }
 
 function doSetup() {
   //createGrid();
   console.log("Test");
   theGrid = new ArrowGrid(10, 10);
+  // A function that updates a hundred times a second
   setInterval(update, 10);
   animate();
 }
