@@ -245,12 +245,15 @@ export class TheGame {
   checkMarkCharacter:GridCharacter;
 
   infoText:PIXI.Text;
+  counterText:PIXI.Text;
   resetText:PIXI.Text;
   reshuffleText:PIXI.Text;
   pauseText:PIXI.Text;
 
   gameState:string; // "ready", "in progress", or "done"
   paused:boolean;
+
+  scoreCounter:number;
 
   constructor(stage:PIXI.Container) {
     this.theGrid = new gridFile.ArrowGrid(10, 10, stage);
@@ -272,8 +275,13 @@ export class TheGame {
     this.infoText.position.y = this.theGrid.container.y + cellDim;
     stage.addChild(this.infoText);
 
+    this.counterText = new PIXI.Text('Score: 0', { font: 'bold 24px Arial', fill: '#ff0000', align: 'left', stroke: '#772200', strokeThickness: 4 });
+    this.counterText.position.x = this.theGrid.container.x + cellDim * (this.theGrid.dimX + 1);
+    this.counterText.position.y = this.theGrid.container.y + cellDim * 2;
+    stage.addChild(this.counterText);
+
     let currentGame:TheGame = this;
-    this.resetText = new PIXI.Text('Reset', { font: 'bold 30px Arial', fill: '#0000ff', align: 'left', stroke: '#FF00FF', strokeThickness: 4 });
+    this.resetText = new PIXI.Text('Reset', { font: 'bold 30px Arial', fill: '#ff00ff', align: 'left', stroke: '#0000FF', strokeThickness: 4 });
     this.resetText.position.x = this.theGrid.container.x + cellDim * (this.theGrid.dimX + 1);
     this.resetText.position.y = this.theGrid.container.y + cellDim * (this.theGrid.dimY - 3);
     stage.addChild(this.resetText);
@@ -284,7 +292,7 @@ export class TheGame {
     });
     this.resetText.visible = false;
 
-    this.reshuffleText = new PIXI.Text('Reshuffle', { font: 'bold 30px Arial', fill: '#0000ff', align: 'left', stroke: '#FF00FF', strokeThickness: 4 });
+    this.reshuffleText = new PIXI.Text('Reshuffle', { font: 'bold 30px Arial', fill: '#ff00ff', align: 'left', stroke: '#0000FF', strokeThickness: 4 });
     this.reshuffleText.position.x = this.theGrid.container.x + cellDim * (this.theGrid.dimX + 1);
     this.reshuffleText.position.y = this.theGrid.container.y + cellDim * (this.theGrid.dimY - 2);
     stage.addChild(this.reshuffleText);
@@ -294,7 +302,7 @@ export class TheGame {
       currentGame.handleReshufflePressed();
     });
 
-    this.pauseText = new PIXI.Text('Pause', { font: 'bold 30px Arial', fill: '#0000ff', align: 'left', stroke: '#FF00FF', strokeThickness: 4 });
+    this.pauseText = new PIXI.Text('Pause', { font: 'bold 30px Arial', fill: '#ff00ff', align: 'left', stroke: '#0000FF', strokeThickness: 4 });
     this.pauseText.position.x = this.theGrid.container.x + cellDim * (this.theGrid.dimX + 1);
     this.pauseText.position.y = this.theGrid.container.y + cellDim * (this.theGrid.dimY - 1);
     stage.addChild(this.pauseText);
@@ -313,6 +321,7 @@ export class TheGame {
 
     this.gameState = "ready";
     this.paused = false;
+    this.scoreCounter = 0;
   }
 
   // Main update function. deltaT is seconds elapsed since last call.
@@ -340,6 +349,11 @@ export class TheGame {
           let cell:gridFile.GridCell = this.theGrid.getCell(char.cellIndexRight, char.cellIndexDown);
           cell.setVisited(true);
           char.requestNewMove(cell.direction);
+          if (char == this.checkMarkCharacter) {
+            // the faster-moving character advances, so increment score
+            this.scoreCounter = this.scoreCounter + 1;
+            this.counterText.text = 'Score: ' + this.scoreCounter;
+          }
         }
       }
     } // end for
@@ -402,20 +416,23 @@ export class TheGame {
     cell.setHighlight(false);
   }
 
-  handleResetPressed() {
-    this.theGrid.resetArrows();
+  private _resetMechanics() {
     this.checkerCharacter.setState("inactive");
     this.checkMarkCharacter.setState("inactive");
     this.infoText.text = "Place piece on board";
+    this.scoreCounter = 0;
+    this.counterText.text = 'Score: ' + this.scoreCounter;
     this.gameState = "ready";
+  }
+
+  handleResetPressed() {
+    this.theGrid.resetArrows();
+    this._resetMechanics();
   }
 
   handleReshufflePressed() {
     this.theGrid.reshuffleArrows();
-    this.checkerCharacter.setState("inactive");
-    this.checkMarkCharacter.setState("inactive");
-    this.infoText.text = "Place piece on board";
-    this.gameState = "ready";
+    this._resetMechanics();
   }
 
   handlePausePressed() {
