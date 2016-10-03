@@ -183,6 +183,8 @@ class GridCharacter {
     this.sprite.alpha = 0;
     container.addChild(this.sprite);
 
+    this.xMovementDir = 0;
+    this.yMovementDir = 0;
     this.isMoving = false;
     this.isOnGrid = true;
     this.paused = false;
@@ -507,6 +509,7 @@ class TheGame {
   handleCellPress(pixX:number, pixY:number) {
     let cellX = Math.floor(pixX / cellDim);
     let cellY = Math.floor(pixY / cellDim);
+    console.log("button cell: " + cellX + "," + cellY);
     if (this.checkerCharacter.getState() == "inactive") {
       this.checkerCharacter.setPosition(cellX, cellY);
       this.checkMarkCharacter.setPosition(cellX, cellY);
@@ -516,7 +519,6 @@ class TheGame {
       this.reshuffleText.visible = false;
       this.pauseText.visible = true;
     }
-    console.log("button cell: " + cellX + "," + cellY);
   }
 
   handleCellOver(pixX:number, pixY:number) {
