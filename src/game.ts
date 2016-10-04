@@ -1,8 +1,6 @@
 import gridFile = require('./grid');
 import PIXI = require('pixi.js');
 
-let cellDim:number = 50;
-
 /*
   --------------------------------------------
   Represents a game piece. A piece can occupy a cell and transition in a
@@ -11,7 +9,10 @@ let cellDim:number = 50;
   --------------------------------------------
 */
 export class GridCharacter {
+  container:PIXI.Container;
   sprite:PIXI.Sprite;
+  static cellDim:number;
+
   cellIndexRight:number; // board coordinate
   cellIndexDown:number;
   xMovementDir:number; // direction of current movement, (-1 = left, 1 = right)
@@ -31,9 +32,11 @@ export class GridCharacter {
   private _state:string;
 
   constructor(name:string, container:PIXI.Container) {
+    this.container = container;
     this.sprite = PIXI.Sprite.fromImage(name);
-    this.sprite.width = cellDim;
-    this.sprite.height = cellDim;
+    GridCharacter.cellDim = gridFile.GridCell.cellDim;
+    this.sprite.width = GridCharacter.cellDim;
+    this.sprite.height = GridCharacter.cellDim;
     this.sprite.anchor.x = 0.5;
     this.sprite.anchor.y = 0.5;
     this.sprite.alpha = 0;
@@ -49,12 +52,17 @@ export class GridCharacter {
     this._state = "inactive";
   }
 
+  cleanup() {
+    this.container.removeChild(this.sprite);
+    this.sprite.destroy();
+  }
+
   // Instantly positions the piece at its start position
   setPosition(i:number, j:number) {
-    this.sprite.x = cellDim * (i + 0.5);
-    this.sprite.y = cellDim * (j + 0.5);
-    this.sprite.width = cellDim;
-    this.sprite.height = cellDim;
+    this.sprite.x = GridCharacter.cellDim * (i + 0.5);
+    this.sprite.y = GridCharacter.cellDim * (j + 0.5);
+    this.sprite.width = GridCharacter.cellDim;
+    this.sprite.height = GridCharacter.cellDim;
     this.sprite.alpha = 1;
     this.cellIndexDown = j;
     this.cellIndexRight = i;
@@ -155,8 +163,8 @@ export class GridCharacter {
   // call.
   update(deltaT) {
     if (this._state == "active") {
-      this.sprite.x = cellDim * (this.cellIndexRight + 0.5 + this.xMovementDir * this.slideValue);
-      this.sprite.y = cellDim * (this.cellIndexDown + 0.5 + this.yMovementDir * this.slideValue);
+      this.sprite.x = GridCharacter.cellDim * (this.cellIndexRight + 0.5 + this.xMovementDir * this.slideValue);
+      this.sprite.y = GridCharacter.cellDim * (this.cellIndexDown + 0.5 + this.yMovementDir * this.slideValue);
       if (this.isMoving) {
         // it takes moveTime seconds to move one square
         this.slideValue = this.slideValue + deltaT / this.moveTime;
@@ -190,8 +198,8 @@ export class GridCharacter {
     else if (this._state == "dying") {
       // fade and shrink effect
       this.sprite.alpha = this.effectSlider;
-      this.sprite.width = cellDim * (0.5 + this.effectSlider / 2);
-      this.sprite.height = cellDim * (0.5 + this.effectSlider / 2);
+      this.sprite.width = GridCharacter.cellDim * (0.5 + this.effectSlider / 2);
+      this.sprite.height = GridCharacter.cellDim * (0.5 + this.effectSlider / 2);
       this.effectSlider = this.effectSlider - deltaT / (this.moveTime * 4.0);
       if (this.effectSlider <= 0.0) {
         this.setState("inactive");
@@ -200,8 +208,8 @@ export class GridCharacter {
     else if (this._state == "explode") {
       // burst and fade effect
       this.sprite.alpha = this.effectSlider;
-      this.sprite.width = cellDim * (1.0 + (3.0 - this.effectSlider * 3.0));
-      this.sprite.height = cellDim * (1.0 + (3.0 - this.effectSlider * 3.0));
+      this.sprite.width = GridCharacter.cellDim * (1.0 + (3.0 - this.effectSlider * 3.0));
+      this.sprite.height = GridCharacter.cellDim * (1.0 + (3.0 - this.effectSlider * 3.0));
       this.effectSlider = this.effectSlider - deltaT / (this.moveTime * 4.0);
       if (this.effectSlider <= 0.0) {
         this.effectSlider = 1; // keep exploding forever
@@ -239,7 +247,10 @@ export class GridCharacter {
   --------------------------------------------
 */
 export class TheGame {
+  stage:PIXI.Container;
+
   theGrid:gridFile.ArrowGrid;
+  boardSize:number; // in cells
 
   checkerCharacter:GridCharacter;
   checkMarkCharacter:GridCharacter;
@@ -249,6 +260,10 @@ export class TheGame {
   resetText:PIXI.Text;
   reshuffleText:PIXI.Text;
   pauseText:PIXI.Text;
+  resizeText:PIXI.Text;
+
+  minusSprite:PIXI.Sprite;
+  plusSprite:PIXI.Sprite;
 
   gameState:string; // "ready", "in progress", or "done"
   paused:boolean;
@@ -256,34 +271,43 @@ export class TheGame {
   scoreCounter:number;
 
   constructor(stage:PIXI.Container) {
-    this.theGrid = new gridFile.ArrowGrid(10, 10, stage);
-    let gameInstance:TheGame = this;
-    let onButtonDown = function() {
-      gameInstance.handleCellPress(this.x, this.y);
-    }
-    let onButtonOver = function() {
-      gameInstance.handleCellOver(this.x, this.y);
-    }
-    let onButtonOut = function() {
-      gameInstance.handleCellOut(this.x, this.y);
-    }
-    this.theGrid.setMouseFunctions(onButtonDown, onButtonOver, onButtonOut);
+    this.stage = stage;
+    let boardDims = {w:500, h:500} // in pixels
+
+    this.theGrid = null;
+    this.boardSize = 16;
+    this._createGrid();
+
+    // Set up info text and score counter
+    // -------------------------------------
+
+    // Some helper data for positioning text and menu items in a vertical
+    // "layout"
+    let textSlotSize = 50;
+    let layoutStartPt = {x:0, y:0}
+    layoutStartPt.x = this.theGrid.container.x + boardDims.w + textSlotSize;
+    layoutStartPt.y = this.theGrid.container.y;
+    let layoutEndPt = {x:layoutStartPt.x, y:layoutStartPt.y + boardDims.h}
 
     // create a text object with a nice stroke
     this.infoText = new PIXI.Text('Place piece on board', { font: 'bold 36px Arial', fill: '#ffff00', align: 'left', stroke: '#0000FF', strokeThickness: 4 });
-    this.infoText.position.x = this.theGrid.container.x + cellDim * (this.theGrid.dimX + 1);
-    this.infoText.position.y = this.theGrid.container.y + cellDim;
+    this.infoText.position.x = layoutStartPt.x;
+    this.infoText.position.y = layoutStartPt.y;
     stage.addChild(this.infoText);
 
     this.counterText = new PIXI.Text('Score: 0', { font: 'bold 24px Arial', fill: '#ff0000', align: 'left', stroke: '#772200', strokeThickness: 4 });
-    this.counterText.position.x = this.theGrid.container.x + cellDim * (this.theGrid.dimX + 1);
-    this.counterText.position.y = this.theGrid.container.y + cellDim * 2;
+    this.counterText.position.x = layoutStartPt.x;
+    this.counterText.position.y = layoutStartPt.y + textSlotSize;
     stage.addChild(this.counterText);
 
+    // Set up selectable menu items
+    // -------------------------------------
+
+    let mainTextDesc = { font: 'bold 30px Arial', fill: '#ff00ff', align: 'left', stroke: '#0000FF', strokeThickness: 4 };
     let currentGame:TheGame = this;
-    this.resetText = new PIXI.Text('Reset', { font: 'bold 30px Arial', fill: '#ff00ff', align: 'left', stroke: '#0000FF', strokeThickness: 4 });
-    this.resetText.position.x = this.theGrid.container.x + cellDim * (this.theGrid.dimX + 1);
-    this.resetText.position.y = this.theGrid.container.y + cellDim * (this.theGrid.dimY - 3);
+    this.resetText = new PIXI.Text('Reset', mainTextDesc);
+    this.resetText.position.x = layoutStartPt.x;
+    this.resetText.position.y = layoutEndPt.y - textSlotSize * 3;
     stage.addChild(this.resetText);
     this.resetText.buttonMode = true;
     this.resetText.interactive = true;
@@ -292,9 +316,9 @@ export class TheGame {
     });
     this.resetText.visible = false;
 
-    this.reshuffleText = new PIXI.Text('Reshuffle', { font: 'bold 30px Arial', fill: '#ff00ff', align: 'left', stroke: '#0000FF', strokeThickness: 4 });
-    this.reshuffleText.position.x = this.theGrid.container.x + cellDim * (this.theGrid.dimX + 1);
-    this.reshuffleText.position.y = this.theGrid.container.y + cellDim * (this.theGrid.dimY - 2);
+    this.reshuffleText = new PIXI.Text('Reshuffle', mainTextDesc);
+    this.reshuffleText.position.x = layoutStartPt.x;
+    this.reshuffleText.position.y = layoutEndPt.y - textSlotSize * 2;
     stage.addChild(this.reshuffleText);
     this.reshuffleText.buttonMode = true;
     this.reshuffleText.interactive = true;
@@ -302,9 +326,9 @@ export class TheGame {
       currentGame.handleReshufflePressed();
     });
 
-    this.pauseText = new PIXI.Text('Pause', { font: 'bold 30px Arial', fill: '#ff00ff', align: 'left', stroke: '#0000FF', strokeThickness: 4 });
-    this.pauseText.position.x = this.theGrid.container.x + cellDim * (this.theGrid.dimX + 1);
-    this.pauseText.position.y = this.theGrid.container.y + cellDim * (this.theGrid.dimY - 1);
+    this.pauseText = new PIXI.Text('Pause', mainTextDesc);
+    this.pauseText.position.x = layoutStartPt.x;
+    this.pauseText.position.y = layoutEndPt.y - textSlotSize;
     stage.addChild(this.pauseText);
     this.pauseText.buttonMode = true;
     this.pauseText.interactive = true;
@@ -313,11 +337,51 @@ export class TheGame {
     });
     this.pauseText.visible = false;
 
-    // Initialize characters
-    this.checkerCharacter = new GridCharacter('images/red-checker.png', this.theGrid.container);
-    this.checkerCharacter.moveTime = 0.5;
-    this.checkMarkCharacter = new GridCharacter('images/green-check-mark.png', this.theGrid.container);
-    this.checkMarkCharacter.moveTime = 0.25;
+    this.resizeText = new PIXI.Text('Board Size: ' + this.boardSize, mainTextDesc);
+    this.resizeText.position.x = layoutStartPt.x;
+    this.resizeText.position.y = layoutEndPt.y - textSlotSize * 4;
+    stage.addChild(this.resizeText);
+    this.resizeText.visible = true;
+
+    // Handy factory function
+    let makeButton = function(filename:string) {
+      let sprite:PIXI.Sprite = PIXI.Sprite.fromImage(filename);
+      sprite.tint = 0x888888;
+      sprite.width = textSlotSize * 0.8;
+      sprite.height = textSlotSize * 0.8;
+      stage.addChild(sprite);
+      sprite.buttonMode = true;
+      sprite.interactive = true;
+      sprite.on('mouseover', function() {
+        this.tint = 0xffffff;
+      });
+      sprite.on('mouseout', function() {
+        this.tint = 0x888888;
+      });
+      sprite.visible = true;
+      return sprite;
+    }
+
+    // Button for changing board size
+    this.minusSprite = makeButton('images/minus-icon.png');
+    this.minusSprite.x = this.resizeText.x + this.resizeText.width + 10;
+    this.minusSprite.y = this.resizeText.y;
+    this.minusSprite.on('mousedown', function() {
+      currentGame.handleResizePressed(-1);
+    });
+
+    // Button for changing board size
+    this.plusSprite = makeButton('images/plus-icon.png');
+    this.plusSprite.x = this.minusSprite.x + this.minusSprite.width + 10;
+    this.plusSprite.y = this.minusSprite.y;
+    this.plusSprite.on('mousedown', function() {
+      currentGame.handleResizePressed(1);
+    });
+
+    this.checkerCharacter = null;
+    this.checkMarkCharacter = null;
+    // Make sure characters exist by now
+    this._createCharacters();
 
     this.gameState = "ready";
     this.paused = false;
@@ -327,6 +391,11 @@ export class TheGame {
   // Main update function. deltaT is seconds elapsed since last call.
   update(deltaT:number) {
     let characters:GridCharacter[] = [this.checkerCharacter, this.checkMarkCharacter];
+
+    if (!this.checkerCharacter) {
+      // no characters exist yet, no point in updating
+      return;
+    }
 
     if (this.paused) {
       for (let char of characters) {
@@ -367,10 +436,7 @@ export class TheGame {
       this.checkMarkCharacter.setState("dying");
       this.checkerCharacter.setState("frozen");
       this.infoText.text = "No Loop";
-      this.gameState = "done";
-      this.resetText.visible = true;
-      this.reshuffleText.visible = true;
-      this.pauseText.visible = false;
+      this._setGameState("done");
     }
     // Are both pieces on the same square? If so, the faster-moving one has caught up with
     // the slower.
@@ -379,60 +445,44 @@ export class TheGame {
         this.checkerCharacter.setState("frozen");
         this.checkMarkCharacter.setState("explode");
         this.infoText.text = "Loop Detected!"
-        this.gameState = "done";
-        this.resetText.visible = true;
-        this.reshuffleText.visible = true;
-        this.pauseText.visible = false;
+        this._setGameState("done");
     }
   }
 
   // Called when user clicks on an arrow cell
   handleCellPress(pixX:number, pixY:number) {
-    let cellX = Math.floor(pixX / cellDim);
-    let cellY = Math.floor(pixY / cellDim);
+    let cellX = Math.floor(pixX / GridCharacter.cellDim);
+    let cellY = Math.floor(pixY / GridCharacter.cellDim);
     console.log("button cell: " + cellX + "," + cellY);
     if (this.checkerCharacter.getState() == "inactive") {
       this.checkerCharacter.setPosition(cellX, cellY);
       this.checkMarkCharacter.setPosition(cellX, cellY);
-      this.infoText.text = "Traveling..."
-      this.gameState = "in progress";
-      this.resetText.visible = false;
-      this.reshuffleText.visible = false;
-      this.pauseText.visible = true;
+      this._setGameState("in progress");
     }
   }
 
   handleCellOver(pixX:number, pixY:number) {
-    let cellX = Math.floor(pixX / cellDim);
-    let cellY = Math.floor(pixY / cellDim);
+    let cellX = Math.floor(pixX / GridCharacter.cellDim);
+    let cellY = Math.floor(pixY / GridCharacter.cellDim);
     let cell:gridFile.GridCell = this.theGrid.getCell(cellX, cellY);
     cell.setHighlight(true);
   }
 
   handleCellOut(pixX:number, pixY:number) {
-    let cellX = Math.floor(pixX / cellDim);
-    let cellY = Math.floor(pixY / cellDim);
+    let cellX = Math.floor(pixX / GridCharacter.cellDim);
+    let cellY = Math.floor(pixY / GridCharacter.cellDim);
     let cell:gridFile.GridCell = this.theGrid.getCell(cellX, cellY);
     cell.setHighlight(false);
   }
 
-  private _resetMechanics() {
-    this.checkerCharacter.setState("inactive");
-    this.checkMarkCharacter.setState("inactive");
-    this.infoText.text = "Place piece on board";
-    this.scoreCounter = 0;
-    this.counterText.text = 'Score: ' + this.scoreCounter;
-    this.gameState = "ready";
-  }
-
   handleResetPressed() {
     this.theGrid.resetArrows();
-    this._resetMechanics();
+    this._setGameState("ready");
   }
 
   handleReshufflePressed() {
     this.theGrid.reshuffleArrows();
-    this._resetMechanics();
+    this._setGameState("ready");
   }
 
   handlePausePressed() {
@@ -447,5 +497,101 @@ export class TheGame {
     this.checkerCharacter.setPaused(pausedState);
     this.checkMarkCharacter.setPaused(pausedState);
     this.paused = pausedState;
+  }
+
+  handleResizePressed(dir:number) {
+    let oldSize:number = this.boardSize;
+    this.boardSize = this.boardSize + dir;
+    if (this.boardSize < 2) {
+      this.boardSize = 2;
+    }
+    else if (this.boardSize > 32) {
+      this.boardSize = 32;
+    }
+    if (oldSize == this.boardSize) {
+      return;
+    }
+    this._destroyCharacters();
+    this._createGrid();
+    this._createCharacters();
+    this.resizeText.text = 'Board Size: ' + this.boardSize;
+    this._setGameState("ready");
+  }
+
+  // Helper function to create the ArrowGrid
+  private _createGrid() {
+    if (this.theGrid) {
+      this.theGrid.cleanup(this.stage);
+    }
+    let boardDims = {w:500, h:500} // in pixels
+    gridFile.GridCell.cellDim = Math.floor(boardDims.w / this.boardSize);
+    GridCharacter.cellDim = gridFile.GridCell.cellDim;
+    this.theGrid = new gridFile.ArrowGrid(this.boardSize, this.boardSize, this.stage);
+    let gameInstance:TheGame = this;
+    // Set up handlers so that cells on board will act as mouse buttons
+    let onButtonDown = function() {
+      gameInstance.handleCellPress(this.x, this.y);
+    }
+    let onButtonOver = function() {
+      gameInstance.handleCellOver(this.x, this.y);
+    }
+    let onButtonOut = function() {
+      gameInstance.handleCellOut(this.x, this.y);
+    }
+    this.theGrid.setMouseFunctions(onButtonDown, onButtonOver, onButtonOut);
+  }
+
+  // Helper function to create the game characters
+  private _createCharacters() {
+    if (this.checkerCharacter) {
+      // Already exist
+      return;
+    }
+    GridCharacter.cellDim = gridFile.GridCell.cellDim;
+    this.checkerCharacter = new GridCharacter('images/red-checker.png', this.theGrid.container);
+    this.checkerCharacter.moveTime = 0.5;
+    this.checkMarkCharacter = new GridCharacter('images/green-check-mark.png', this.theGrid.container);
+    this.checkMarkCharacter.moveTime = 0.25;
+  }
+
+  // Helper function to destroy the game characters (should be done before grid destruction)
+  private _destroyCharacters() {
+    this.checkerCharacter.cleanup();
+    this.checkerCharacter = null;
+    this.checkMarkCharacter.cleanup();
+    this.checkMarkCharacter = null;
+  }
+
+  // Puts the game into one of its overall states. Affects UI.
+  //   "ready" = ready to place a piece
+  //   "in progress" = game is being place
+  //   "done" = game has reached end state
+  private _setGameState(state:string) {
+    console.log('Game state to: ' + state);
+    if (state == "in progress") {
+      this.infoText.text = "Traveling..."
+      this.gameState = "in progress";
+      this.resetText.visible = false;
+      this.reshuffleText.visible = false;
+      this.resizeText.visible = false;
+      this.minusSprite.visible = false;
+      this.plusSprite.visible = false;
+      this.pauseText.visible = true;
+    }
+    else if (state == "ready") {
+      this.checkerCharacter.setState("inactive");
+      this.checkMarkCharacter.setState("inactive");
+      this.infoText.text = "Place piece on board";
+      this.scoreCounter = 0;
+      this.counterText.text = 'Score: ' + this.scoreCounter;
+    }
+    else if (state == "done") {
+      this.resetText.visible = true;
+      this.reshuffleText.visible = true;
+      this.resizeText.visible = true;
+      this.minusSprite.visible = true;
+      this.plusSprite.visible = true;
+      this.pauseText.visible = false;
+    }
   }
 }

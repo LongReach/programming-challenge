@@ -1,7 +1,5 @@
 import PIXI = require('pixi.js');
 
-let cellDim:number = 50;
-
 // -----------------------
 // Class definitions
 // -----------------------
@@ -13,6 +11,8 @@ let cellDim:number = 50;
 */
 export class GridCell {
   sprite:PIXI.Sprite;
+  static cellDim:number = 50; // dimension of a cell in pixels
+
   // Arrow's facing direction: 0=left, 1=up, 2=right, 3=down
   direction:number;
   cellX:number; // coordinate on the game board, from left
@@ -21,10 +21,10 @@ export class GridCell {
 
   constructor(i:number, j:number, container:PIXI.Container) {
     var arrow = PIXI.Sprite.fromImage('images/arrow-icon.png');
-    arrow.x = cellDim * (i + 0.5);
-    arrow.y = cellDim * (j + 0.5);
-    arrow.width = cellDim;
-    arrow.height = cellDim;
+    arrow.x = GridCell.cellDim * (i + 0.5);
+    arrow.y = GridCell.cellDim * (j + 0.5);
+    arrow.width = GridCell.cellDim;
+    arrow.height = GridCell.cellDim;
     arrow.anchor.x = 0.5;
     arrow.anchor.y = 0.5;
     container.addChild(arrow);
@@ -101,6 +101,11 @@ export class ArrowGrid {
       };
     }
     this.reshuffleArrows();
+  }
+
+  cleanup(stage:PIXI.Container) {
+    stage.removeChild(this.container);
+    this.container.destroy();
   }
 
   setMouseFunctions(onButtonDown:()=>void, onButtonOver:()=>void, onButtonOut:()=>void) {
