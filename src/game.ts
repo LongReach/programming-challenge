@@ -1,5 +1,6 @@
 import gridFile = require('./grid');
 import PIXI = require('pixi.js');
+import HOWL = require('howler');
 
 /*
   --------------------------------------------
@@ -11,7 +12,8 @@ import PIXI = require('pixi.js');
 export class GridCharacter {
   container:PIXI.Container;
   sprite:PIXI.Sprite;
-  static cellDim:number;
+  static cellDim:number; // Dimensions of a cell in pixels
+                         // (changes after board resize)
 
   cellIndexRight:number; // board coordinate
   cellIndexDown:number;
@@ -24,10 +26,9 @@ export class GridCharacter {
   restTimer:number;  // the piece "rests" for a bit after arriving
   moveTime:number; // how many seconds a move or rest period takes
 
-  onInitialCell:boolean;
-  isMoving:boolean;
-  isOnGrid:boolean; // false if piece moves off board
-  paused:boolean;
+  onInitialCell:boolean; // true is piece is still on first cell
+  isMoving:boolean; // true if piece is visually moving
+  paused:boolean; // true if piece is in a paused state, similar to game character
 
   private _state:string;
 
@@ -45,13 +46,13 @@ export class GridCharacter {
     this.xMovementDir = 0;
     this.yMovementDir = 0;
     this.isMoving = false;
-    this.isOnGrid = true;
     this.paused = false;
     this.restTimer = 0;
     this.moveTime = 1.0;
     this._state = "inactive";
   }
 
+  // Prepares piece for destruction
   cleanup() {
     this.container.removeChild(this.sprite);
     this.sprite.destroy();
@@ -69,7 +70,6 @@ export class GridCharacter {
     this.onInitialCell = true;
     this.paused = false;
     this.isMoving = false;
-    this.isOnGrid = true;
     this.slideValue = 0;
     this.restTimer = this.moveTime; // let it rest before starting move
     this._state = "active";
@@ -150,7 +150,6 @@ export class GridCharacter {
     else if (state == "inactive") {
       this.sprite.alpha = 0;
       this.isMoving = false;
-      this.isOnGrid = true;
     }
   }
 
@@ -270,6 +269,16 @@ export class TheGame {
 
   scoreCounter:number;
 
+  // The game sounds
+  // strong typing doesn't work on these, for whatever reason
+  soundSuccess;
+  soundAdvance;
+  soundFailure;
+  soundMenuChoice;
+  soundResize;
+  soundShuffle;
+  soundPause;
+
   constructor(stage:PIXI.Container) {
     this.stage = stage;
     let boardDims = {w:500, h:500} // in pixels
@@ -277,6 +286,16 @@ export class TheGame {
     this.theGrid = null;
     this.boardSize = 16;
     this._createGrid();
+
+    // Ugh, it took me a long time to get this working. The module couldn't be
+    // named "Howl", or the browser would reject it (no compile error!)
+    this.soundSuccess = new HOWL.Howl({src: 'sounds/success.wav'});
+    this.soundAdvance = new HOWL.Howl({src: 'sounds/advance.wav', volume:0.3});
+    this.soundFailure = new HOWL.Howl({src: 'sounds/failure.wav'});
+    this.soundMenuChoice = new HOWL.Howl({src: 'sounds/menu-choice.wav'});
+    this.soundResize = new HOWL.Howl({src: 'sounds/resize.wav'});
+    this.soundShuffle = new HOWL.Howl({src: 'sounds/shuffle.mp3'});
+    this.soundPause = new HOWL.Howl({src: 'sounds/pause.mp3'});
 
     // Set up info text and score counter
     // -------------------------------------
@@ -404,13 +423,16 @@ export class TheGame {
       return;
     }
 
+    let leavingGridChar:GridCharacter = null; // the char leaving the grid, if any
+    // Iterate through game pieces, call their update functions, see if
+    // any must be issued new move.
     for (let char of characters) {
       char.update(deltaT);
       if (char.readyToMove()) {
         // Has character fallen off grid?
         if (char.cellIndexDown < 0 || char.cellIndexDown >= this.theGrid.dimY ||
           char.cellIndexRight < 0 || char.cellIndexRight >= this.theGrid.dimX) {
-          char.isOnGrid = false;
+          leavingGridChar = char;
         }
         else
         {
@@ -422,20 +444,25 @@ export class TheGame {
             // the faster-moving character advances, so increment score
             this.scoreCounter = this.scoreCounter + 1;
             this.counterText.text = 'Score: ' + this.scoreCounter;
+            this.soundAdvance.play();
+          }
+          if (char == this.checkerCharacter) {
+            // the slow-moving character advances
           }
         }
       }
     } // end for
 
-    if (!this.checkerCharacter.isOnGrid) {
+    if (leavingGridChar == this.checkerCharacter) {
       // slower-moving piece has left the board
       this.checkerCharacter.setState("frozen");
     }
-    if (!this.checkMarkCharacter.isOnGrid) {
+    if (leavingGridChar == this.checkMarkCharacter) {
       // faster-moving piece has left the board
       this.checkMarkCharacter.setState("dying");
       this.checkerCharacter.setState("frozen");
       this.infoText.text = "No Loop";
+      this.soundFailure.play();
       this._setGameState("done");
     }
     // Are both pieces on the same square? If so, the faster-moving one has caught up with
@@ -446,6 +473,7 @@ export class TheGame {
         this.checkMarkCharacter.setState("explode");
         this.infoText.text = "Loop Detected!"
         this._setGameState("done");
+        this.soundSuccess.play();
     }
   }
 
@@ -457,6 +485,7 @@ export class TheGame {
     if (this.checkerCharacter.getState() == "inactive") {
       this.checkerCharacter.setPosition(cellX, cellY);
       this.checkMarkCharacter.setPosition(cellX, cellY);
+      this.soundMenuChoice.play();
       this._setGameState("in progress");
     }
   }
@@ -477,11 +506,13 @@ export class TheGame {
 
   handleResetPressed() {
     this.theGrid.resetArrows();
+    this.soundMenuChoice.play();
     this._setGameState("ready");
   }
 
   handleReshufflePressed() {
     this.theGrid.reshuffleArrows();
+    this.soundShuffle.play();
     this._setGameState("ready");
   }
 
@@ -496,9 +527,12 @@ export class TheGame {
     }
     this.checkerCharacter.setPaused(pausedState);
     this.checkMarkCharacter.setPaused(pausedState);
+    this.soundPause.play();
     this.paused = pausedState;
   }
 
+  // Called when user resizes the game board. Destroys the board and the
+  // game pieces, then recreates them at new size.
   handleResizePressed(dir:number) {
     let oldSize:number = this.boardSize;
     this.boardSize = this.boardSize + dir;
@@ -511,6 +545,7 @@ export class TheGame {
     if (oldSize == this.boardSize) {
       return;
     }
+    this.soundResize.play();
     this._destroyCharacters();
     this._createGrid();
     this._createCharacters();
@@ -524,6 +559,8 @@ export class TheGame {
       this.theGrid.cleanup(this.stage);
     }
     let boardDims = {w:500, h:500} // in pixels
+    // The dimensions of a board cell and a game character in pixels must be
+    // set.
     gridFile.GridCell.cellDim = Math.floor(boardDims.w / this.boardSize);
     GridCharacter.cellDim = gridFile.GridCell.cellDim;
     this.theGrid = new gridFile.ArrowGrid(this.boardSize, this.boardSize, this.stage);

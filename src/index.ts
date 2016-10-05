@@ -5,6 +5,7 @@
 import gridFile = require('./grid');
 import gameFile = require('./game'); // "requires game", ha
 import PIXI = require('pixi.js');
+import Howler = require('howler');
 const renderer:PIXI.WebGLRenderer = new PIXI.WebGLRenderer(1280, 720);
 document.body.appendChild(renderer.view);
 

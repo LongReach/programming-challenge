@@ -35,8 +35,8 @@ export class GridCell {
     this.setVisited(false);
   }
 
+  // Set up this cell to act as a button
   setMouseFunctions(onButtonDown:()=>void, onButtonOver:()=>void, onButtonOut:()=>void) {
-      // onEvent functions are global functions (towards bottom of file)
       this.sprite.buttonMode = true;
       this.sprite.interactive = true;
       this.sprite.on('mousedown', onButtonDown);
@@ -63,7 +63,7 @@ export class GridCell {
   }
 
   // If value==true, temporarily highlights the cell
-  // If value==true, it reverts to its previous color
+  // If value==false, it reverts to its previous color
   setHighlight(value:boolean) {
     let currentValue:boolean = this.visited;
     if (!value) {
@@ -103,11 +103,14 @@ export class ArrowGrid {
     this.reshuffleArrows();
   }
 
+  // Prepares the grid for removal
   cleanup(stage:PIXI.Container) {
     stage.removeChild(this.container);
     this.container.destroy();
   }
 
+  // Sets up each cell to act as a button. The given functions respond to various
+  // mouse events.
   setMouseFunctions(onButtonDown:()=>void, onButtonOver:()=>void, onButtonOut:()=>void) {
     for (var j = 0; j < this.dimY; j++) {
       for (var i = 0; i < this.dimX; i++) {
