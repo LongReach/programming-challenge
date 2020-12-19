@@ -6,7 +6,7 @@
 
 This was a coding challenge I completed as part of my interview process for a previous employer. The company has since ceased to exist, so I doubt anyone will mind if I publish my code here.
 
-I wrote this code in TypeScript (as superset of JavaScript, as described below). I had had only the most minimal experience with Javascript prior to working on this challenge, so this is an example of code I wrote in a language I didn't even know at all two days before. If you've coded in a number of other languages, JavaScript is not hard to pick up.
+I wrote this code in TypeScript (a superset of JavaScript, as described below). I had had only the most minimal experience with Javascript prior to working on this challenge, so this is an example of code I wrote in a language I didn't even know at all two days prior. If you've coded in a number of other languages, JavaScript is not hard to pick up.
 
 ## The Challenge
 
@@ -31,7 +31,9 @@ and ecosystems. Have fun with it.*
 
 ![](images/green-check-mark-small.png)
 
-Nothing too special to say. I relied on my experience as a game developer and added some animation and sound effects. My solution, of course, is object-oriented.
+Overall, I relied on my experience as a game developer and added some fun animation and sound effects. My code, of course, is object-oriented.
+
+My solution to the constant memory space problem relied on [Floyd's Tortoise and Hare Algorithn](https://en.wikipedia.org/wiki/Cycle_detection#Floyd.27s_Tortoise_and_Hare) for linked list cycle detection. That's visualized by the red checker and the green check mark, which move at different speeds. If they collide, there's a loop.
 
 Starting state of the game:
 
