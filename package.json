@@ -21,19 +21,20 @@
   },
   "devDependencies": {
     "cross-conf-env": "latest",
-    "tsify": "latest",
-    "typescript": "^1.8.10",
+    "electron": "^11.1.0",
+    "mapstraction": "latest",
     "parallelshell": "latest",
     "preprocessify": "latest",
-    "mapstraction": "latest",
     "rimraf": "latest",
+    "tsify": "latest",
+    "typescript": "^1.8.10",
     "watch": "latest",
     "watchify": "latest"
   },
   "dependencies": {
     "electron-prebuilt": "^1.4.1",
     "howler": "^2.0.0",
-    "pixi.js": "^4.0.2",
+    "pixi.js": "^4.8.9",
     "pizzicato": "^0.4.0"
   }
 }
