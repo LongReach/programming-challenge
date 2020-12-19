@@ -1,3 +1,62 @@
+# Top Level Notes
+
+## About
+
+![](images/bunny.jpeg)
+
+This was a coding challenge I completed as part of my interview process for a previous employer. The company has since ceased to exist, so I doubt anyone will mind if I publish my code here.
+
+I wrote this code in TypeScript (as superset of JavaScript, as described below). I had had only the most minimal experience with Javascript prior to working on this challenge, so this is an example of code I wrote in a language I didn't even know at all two days before. If you've coded in a number of other languages, JavaScript is not hard to pick up.
+
+## The Challenge
+
+![](images/red-checker-small.png)
+
+Text copied from below:
+
+*Consider a checkerboard of unknown size. On each square is an arrow that randomly points either up, down,
+left, or right. A checker is placed on a random square. Each turn the checker moves one square in the direction
+of the arrow. Visualize an algorithm that determines if the checker moves off the edge of the board or ends up in a cycle.*
+
+  - *Include UI controls to play, stop, and reset the game.*
+  - *Include UI controls to change the size of the board and to shuffle the arrows.*
+  - *Include audio to make things more interesting.*
+  - *Add some style to make it look good.*
+  - *Write the algorithm in constant memory space. The brute force solution is O(n) memory space.*
+
+*This challenge is meant to show off code organization, quality, and cleanliness, design patterns, and the ability to learn new languages
+and ecosystems. Have fun with it.*
+
+## My implementation
+
+![](images/green-check-mark-small.png)
+
+Nothing too special to say. I relied on my experience as a game developer and added some animation and sound effects. My solution, of course, is object-oriented.
+
+Starting state of the game:
+
+![](images/CheckerboardGame1.png)
+
+Game in progress (shown with a smaller grid):
+
+![](images/CheckerboardGame2.png)
+
+## Installation
+
+![](images/arrow-icon-small.png)
+
+Follow the instructions that come after ***Original README*** below. They still work in December, 2020.
+
+However, you might also add the additional two steps, if things don't work initially:
+```
+npm install electron -g
+npm install pixi.js
+```
+
+---------------------------------------------------------------------------------------------------
+
+# Original README
+
 ## Prereqs
 
 Install [Node.js 4.5.0](https://nodejs.org/en/). This will also install `npm` as a global command.
